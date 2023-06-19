@@ -3,9 +3,8 @@ import pytest
 import functools
 import openai.client
 
+# Live tests
 API_TYPE = ["azure", "openai", "azuredefault"]
-
-
 API_BASE = os.environ["AZURE_API_BASE"]
 AZURE_API_KEY = os.environ["AZURE_KEY"]
 OPENAI_API_KEY = os.environ["OPENAI_KEY"]
@@ -56,6 +55,7 @@ def clear_oai_module(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(openai, 'api_key', None)
     monkeypatch.setattr(openai, 'api_type', "open_ai")
     monkeypatch.setattr(openai, 'api_version', None)
+    monkeypatch.setattr(openai, 'organization', None)
 
 def setup_oai_module(monkeypatch: pytest.MonkeyPatch, **kwargs):
     for n, v in kwargs.items():
@@ -120,9 +120,10 @@ def test_construct_azure_client_api_key(monkeypatch: pytest.MonkeyPatch, clear_o
     assert client.auth.get_token() == 'secret key'
 
 def test_construct_openai_client_api_key():
-    client = openai.client.OpenAIClient(auth='secret key')
+    client = openai.client.OpenAIClient(auth='secret key', organization="my org")
     assert client.api_base == openai.api_base
     assert client.api_type == 'open_ai'
+    assert client.organization == "my org"
     assert client.auth.get_token() == 'secret key'
 
 def test_make_call_client_aad(monkeypatch: pytest.MonkeyPatch, clear_oai_module, embedding_response):
@@ -202,6 +203,7 @@ def test_populate_args():
         "api_type": "open_ai",
         "api_version": "expected",
         "prompt": "expected",
+        "organization": None,
         "temperature": 0.1
     }
 
@@ -213,6 +215,7 @@ def test_populate_args():
         "api_key": "expected",
         "api_type": "expected",
         "api_version": "expected",
+        "organization": "expected",
         "stream": True
     }
 
@@ -230,6 +233,7 @@ def test_populate_args():
         "api_key": "expected",
         "api_type": "expected",
         "api_version": "expected",
+        "organization": "expected",
         "stream": True
     }
 
@@ -260,7 +264,7 @@ def test_normalize_model():
     assert kwargs == {"deployment_id": "ada"}
 
     client = openai.client.OpenAIClient(backend="openai")
-    # openai: deployment_id --> model
+    # openai: deployment_id --> exception
     kwargs = {"deployment_id": "ada"}
     client._normalize_model(kwargs)
     # incorrect arg raised by library
@@ -280,6 +284,7 @@ def test_normalize_model():
     kwargs = {"model": "ada", "deployment_id": "ada"}
     with pytest.raises(TypeError):
         client._normalize_model(kwargs)
+
 
 # LIVE TESTS ------------------------------------------------
 # COMPLETION TESTS
