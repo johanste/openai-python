@@ -415,6 +415,29 @@ class OpenAIClient:
         self._normalize_model(kwargs)
         return cast(openai.Edit, await openai.Edit.create(**kwargs))
 
+    def moderation(
+        self,
+        input: Union[str, Iterable[str]],
+        **kwargs,
+    ):
+        self._populate_args(
+            kwargs,
+            input=input,
+        )
+        self._normalize_model(kwargs)
+        return cast(openai.Moderation, openai.Moderation.create(**kwargs))
+
+    async def amoderation(
+        self,
+        input: Union[str, Iterable[str]],
+        **kwargs,
+    ):
+        self._populate_args(
+            kwargs,
+            input=input,
+        )
+        self._normalize_model(kwargs)
+        return cast(openai.Moderation, await openai.Moderation.create(**kwargs))
 
 if __name__ == "__main__":
     client = OpenAIClient(
