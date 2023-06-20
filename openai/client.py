@@ -371,7 +371,49 @@ class OpenAIClient:
             response_format=response_format,
             user=user,
         )
-        return typing.cast(openai.Image, await openai.Image.acreate_edit(**kwargs))
+        return cast(openai.Image, await openai.Image.acreate_edit(**kwargs))
+
+    def edit(
+        self,
+        instruction: str,
+        *,
+        input: str = ...,
+        n: int = ...,
+        temperature: float = ...,
+        top_p: float = ...,
+        **kwargs,
+    ):
+        self._populate_args(
+            kwargs,
+            instruction=instruction,
+            input=input,
+            n=n,
+            temperature=temperature,
+            top_p=top_p,
+        )
+        self._normalize_model(kwargs)
+        return cast(openai.Edit, openai.Edit.create(**kwargs))
+
+    async def aedit(
+        self,
+        instruction: str,
+        *,
+        input: str = ...,
+        n: int = ...,
+        temperature: float = ...,
+        top_p: float = ...,
+        **kwargs,
+    ):
+        self._populate_args(
+            kwargs,
+            instruction=instruction,
+            input=input,
+            n=n,
+            temperature=temperature,
+            top_p=top_p,
+        )
+        self._normalize_model(kwargs)
+        return cast(openai.Edit, await openai.Edit.create(**kwargs))
 
 
 if __name__ == "__main__":
