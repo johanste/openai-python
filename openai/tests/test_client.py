@@ -1,6 +1,5 @@
 import os
 import pytest
-import functools
 import openai.client
 
 # Live tests
@@ -17,34 +16,30 @@ IMAGE_PATH = ""
 MASK_IMAGE_PATH = ""
 
 
-def configure_client(f):
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-        api_type = kwargs.pop("api_type")
-        if api_type == "azure":
-            client = openai.client.OpenAIClient(
-                api_base=API_BASE,
-                auth=AZURE_API_KEY,
-                api_version=API_VERSION,
-                backend="azure"
-            )
-        elif api_type == "azuredefault":
-            api_type = "azure"
-            client = openai.client.OpenAIClient(
-                api_base=API_BASE,
-                auth="azuredefault",
-                api_version=API_VERSION,
-                backend="azure"
-            )
-        elif api_type == "openai":
-            client = openai.client.OpenAIClient(
-                auth=OPENAI_API_KEY,
-                backend="openai"
-            )
-        kwargs = {"client": client}
-        return f(api_type, **kwargs)
+@pytest.fixture
+def client(api_type):
+    if api_type == "azure":
+        client = openai.client.OpenAIClient(
+            api_base=API_BASE,
+            auth=AZURE_API_KEY,
+            api_version=API_VERSION,
+            backend="azure"
+        )
+    elif api_type == "azuredefault":
+        api_type = "azure"
+        client = openai.client.OpenAIClient(
+            api_base=API_BASE,
+            auth="azuredefault",
+            api_version=API_VERSION,
+            backend="azure"
+        )
+    elif api_type == "openai":
+        client = openai.client.OpenAIClient(
+            auth=OPENAI_API_KEY,
+            backend="openai"
+        )
 
-    return wrapper
+    return client
 
 
 @pytest.fixture
@@ -60,28 +55,6 @@ def clear_oai_module(monkeypatch: pytest.MonkeyPatch):
 def setup_oai_module(monkeypatch: pytest.MonkeyPatch, **kwargs):
     for n, v in kwargs.items():
         monkeypatch.setattr(openai, n, v)
-
-@pytest.fixture
-def embedding_response():
-    return   {
-                "object": "list",
-                "data": [
-                    {
-                    "object": "embedding",
-                    "embedding": [
-                        0.0023064255,
-                        -0.009327292,
-                        -0.0028842222,
-                    ],
-                    "index": 0
-                    }
-                ],
-                "model": "text-embedding-ada-002",
-                "usage": {
-                    "prompt_tokens": 8,
-                    "total_tokens": 8
-                }
-        }
 
 
 # MOCK TESTS ------------------------------------------------
@@ -126,7 +99,7 @@ def test_construct_openai_client_api_key():
     assert client.organization == "my org"
     assert client.auth.get_token() == 'secret key'
 
-def test_make_call_client_aad(monkeypatch: pytest.MonkeyPatch, clear_oai_module, embedding_response):
+def test_make_call_client_aad(monkeypatch: pytest.MonkeyPatch, clear_oai_module):
     provided_api_base = 'https://contoso.microsoft.com'
     def mock_get_token(*args, **kwargs):
         return 'expected token'
@@ -135,7 +108,6 @@ def test_make_call_client_aad(monkeypatch: pytest.MonkeyPatch, clear_oai_module,
         assert kwargs.get('deployment_id') == 'das deployment'
         assert kwargs.get('api_version') == openai.client.LATEST_AZURE_API_VERSION
         assert kwargs.get('api_type') == 'azure_ad'
-        return embedding_response
 
     monkeypatch.setattr(openai.client.AzureTokenAuth, 'get_token', mock_get_token)
     monkeypatch.setattr(openai.Embedding, 'create', mock_embeddings_response)
@@ -144,7 +116,7 @@ def test_make_call_client_aad(monkeypatch: pytest.MonkeyPatch, clear_oai_module,
     client.embeddings("some data", model='das deployment')
 
 
-def test_make_call_client_azure_key(monkeypatch: pytest.MonkeyPatch, clear_oai_module, embedding_response):
+def test_make_call_client_azure_key(monkeypatch: pytest.MonkeyPatch, clear_oai_module):
     provided_api_base = 'https://contoso.microsoft.com'
     def mock_get_token(*args, **kwargs):
         return 'expected token'
@@ -153,7 +125,6 @@ def test_make_call_client_azure_key(monkeypatch: pytest.MonkeyPatch, clear_oai_m
         assert kwargs.get('api_version') == openai.client.LATEST_AZURE_API_VERSION
         assert kwargs.get('api_type') == 'azure'
         assert kwargs.get('api_key', 'secret key')
-        return embedding_response
     
     monkeypatch.setattr(openai.client.AzureTokenAuth, 'get_token', mock_get_token)
     monkeypatch.setattr(openai.Embedding, 'create', mock_embeddings_response)
@@ -162,7 +133,7 @@ def test_make_call_client_azure_key(monkeypatch: pytest.MonkeyPatch, clear_oai_m
     client.embeddings("some data", model='das deployment')
 
 
-def test_make_call_client_oai_key(monkeypatch: pytest.MonkeyPatch, clear_oai_module, embedding_response):
+def test_make_call_client_oai_key(monkeypatch: pytest.MonkeyPatch, clear_oai_module):
     provided_api_base = 'https://contoso.microsoft.com'
     def mock_get_token(*args, **kwargs):
         return 'expected token'
@@ -170,8 +141,6 @@ def test_make_call_client_oai_key(monkeypatch: pytest.MonkeyPatch, clear_oai_mod
         assert kwargs.get('model') == 'das model'
         assert kwargs.get('api_type') == 'open_ai'
         assert kwargs.get('api_key', 'secret key')
-        return embedding_response
-    
 
     monkeypatch.setattr(openai.client.AzureTokenAuth, 'get_token', mock_get_token)
     monkeypatch.setattr(openai.Embedding, 'create', mock_embeddings_response)
@@ -289,9 +258,7 @@ def test_normalize_model():
 # LIVE TESTS ------------------------------------------------
 # COMPLETION TESTS
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-def test_client_completion(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_completion(client):
     completion = client.completion(
         prompt="hello world",
         model=COMPLETION_MODEL
@@ -300,9 +267,7 @@ def test_client_completion(api_type, **kwargs):
 
 
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-def test_client_completion_stream(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_completion_stream(client):
     completion = client.iter_completion(
         prompt="hello world",
         model=COMPLETION_MODEL
@@ -312,9 +277,7 @@ def test_client_completion_stream(api_type, **kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-async def test_client_acompletion(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_acompletion(client):
     completion = await client.acompletion(
         prompt="hello world",
         model=COMPLETION_MODEL
@@ -323,9 +286,7 @@ async def test_client_acompletion(api_type, **kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-async def test_client_acompletion_stream(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_acompletion_stream(client):
     completion = await client.aiter_completion(
         prompt="hello world",
         model=COMPLETION_MODEL
@@ -336,57 +297,49 @@ async def test_client_acompletion_stream(api_type, **kwargs):
 
 # CHAT COMPLETION TESTS
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-def test_client_chatcompletion(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_chatcompletion(client):
     chat_completion = client.chatcompletion(
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Who won the world series in 2020?"}
         ],
-        model=CHAT_COMPLETION_MODEL if api_type == "azure" else CHAT_COMPLETION_MODEL_OPENAI
+        model=CHAT_COMPLETION_MODEL if client.backend == "azure" else CHAT_COMPLETION_MODEL_OPENAI
     )
     assert chat_completion
 
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-def test_client_chat_completion_stream(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_chat_completion_stream(client):
     chat_completion = client.iter_chatcompletion(
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Who won the world series in 2020?"}
         ],
-        model=CHAT_COMPLETION_MODEL if api_type == "azure" else CHAT_COMPLETION_MODEL_OPENAI
+        model=CHAT_COMPLETION_MODEL if client.backend == "azure" else CHAT_COMPLETION_MODEL_OPENAI
     )
     for c in chat_completion:
         assert c
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-async def test_client_achatcompletion(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_achatcompletion(client):
     chat_completion = await client.achatcompletion(
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Who won the world series in 2020?"}
         ],
-        model=CHAT_COMPLETION_MODEL if api_type == "azure" else CHAT_COMPLETION_MODEL_OPENAI
+        model=CHAT_COMPLETION_MODEL if client.backend == "azure" else CHAT_COMPLETION_MODEL_OPENAI
     )
     assert chat_completion
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-async def test_client_achat_completion_stream(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_achat_completion_stream(client):
     chat_completion = await client.aiter_chatcompletion(
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Who won the world series in 2020?"}
         ],
-        model=CHAT_COMPLETION_MODEL if api_type == "azure" else CHAT_COMPLETION_MODEL_OPENAI
+        model=CHAT_COMPLETION_MODEL if client.backend == "azure" else CHAT_COMPLETION_MODEL_OPENAI
     )
     async for c in chat_completion:
         assert c
@@ -394,9 +347,7 @@ async def test_client_achat_completion_stream(api_type, **kwargs):
 
 # EMBEDDING TESTS
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-def test_client_embeddings(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_embeddings(client):
     embeddings = client.embeddings(
         input="hello world",
         model=EMBEDDINGS_MODEL
@@ -405,9 +356,7 @@ def test_client_embeddings(api_type, **kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-async def test_client_aembeddings(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_aembeddings(client):
     embeddings = await client.aembeddings(
         input="hello world",
         model=EMBEDDINGS_MODEL
@@ -417,9 +366,7 @@ async def test_client_aembeddings(api_type, **kwargs):
 
 # IMAGE CREATE TESTS
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-def test_client_image_create(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_image_create(client):
     image = client.image(
         prompt="A cute baby sea otter",
         n=1
@@ -428,9 +375,7 @@ def test_client_image_create(api_type, **kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", API_TYPE)
-@configure_client
-async def test_client_aimage_create(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_aimage_create(client):
     image = await client.aimage(
         prompt="A cute baby sea otter",
         n=1
@@ -440,9 +385,7 @@ async def test_client_aimage_create(api_type, **kwargs):
 
 # IMAGE VARIATION TESTS
 @pytest.mark.parametrize("api_type", ["openai"])
-@configure_client
-def test_client_image_variation(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_image_variation(client):
     variation = client.image_variation(
         image=open(IMAGE_PATH, "rb"),
         n=2,
@@ -452,9 +395,7 @@ def test_client_image_variation(api_type, **kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", ["openai"])
-@configure_client
-async def test_client_aimage_variation(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_aimage_variation(client):
     variation = await client.aimage_variation(
         image=open(IMAGE_PATH, "rb"),
         n=2,
@@ -464,9 +405,7 @@ async def test_client_aimage_variation(api_type, **kwargs):
 
 # IMAGE EDIT TESTS
 @pytest.mark.parametrize("api_type", ["openai"])
-@configure_client
-def test_client_image_edit(api_type, **kwargs):
-    client = kwargs.pop("client")
+def test_client_image_edit(client):
     edit = client.image_edit(
         image=open(IMAGE_PATH, "rb"),
         mask=open(MASK_IMAGE_PATH, "rb"),
@@ -478,9 +417,7 @@ def test_client_image_edit(api_type, **kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_type", ["openai"])
-@configure_client
-async def test_client_aimage_edit(api_type, **kwargs):
-    client = kwargs.pop("client")
+async def test_client_aimage_edit(client):
     edit = await client.aimage_edit(
         image=open(IMAGE_PATH, "rb"),
         mask=open(MASK_IMAGE_PATH, "rb"),
