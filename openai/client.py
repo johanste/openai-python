@@ -479,7 +479,7 @@ class OpenAIClient:
             language=language
         )
         self._normalize_model(kwargs)
-        return cast(openai.Audio, await openai.Audio.transcribe(**kwargs))
+        return cast(openai.Audio, await openai.Audio.atranscribe(**kwargs))
 
     def translate_audio(
         self,
