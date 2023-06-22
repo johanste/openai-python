@@ -437,7 +437,7 @@ class OpenAIClient:
             input=input,
         )
         self._normalize_model(kwargs)
-        return cast(openai.Moderation, await openai.Moderation.create(**kwargs))
+        return cast(openai.Moderation, await openai.Moderation.acreate(**kwargs))
 
     def transcribe_audio(
         self,
