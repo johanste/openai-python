@@ -517,7 +517,7 @@ class OpenAIClient:
             temperature=temperature,
         )
         self._normalize_model(kwargs)
-        return cast(openai.Audio, await openai.Audio.translate(**kwargs))
+        return cast(openai.Audio, await openai.Audio.atranslate(**kwargs))
 
 if __name__ == "__main__":
     client = OpenAIClient(
