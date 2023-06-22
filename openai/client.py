@@ -413,7 +413,7 @@ class OpenAIClient:
             top_p=top_p,
         )
         self._normalize_model(kwargs)
-        return cast(openai.Edit, await openai.Edit.create(**kwargs))
+        return cast(openai.Edit, await openai.Edit.acreate(**kwargs))
 
     def moderation(
         self,
