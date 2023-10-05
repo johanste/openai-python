@@ -418,19 +418,19 @@ class AsyncAzureOpenAIClient(AsyncClient):
     async def _request(self, cast_to: Type[ResponseT], options: FinalRequestOptions, **kwargs: Any) -> Any:
         if options.url == "/images/generations":
             options.url = "openai/images/generations:submit"
-            response = await super().request(httpx.Response, **kwargs)
-            operation_id = cast(Mapping[str, Any], getattr(response, 'model_extra')) or {}
+            response = await super()._request(cast_to=cast_to, options=options, **kwargs)
+            model_extra = cast(Mapping[str, Any], getattr(response, 'model_extra')) or {}
+            operation_id = cast(str, model_extra['id'])
             return await self._poll(
                 "get", f"openai/operations/images/{operation_id}",
                 until=lambda response: response.json()["status"] in ["succeeded"],
                 failed=lambda response: response.json()["status"] in ["failed"],
             )
         if isinstance(options.json_data, Mapping):
-            model = cast(str, options.json_data["model"])        
+            model = cast(str, options.json_data["model"])
             if not options.url.startswith(f'openai/deployments/{model}'):
                 if options.extra_json and options.extra_json.get("dataSources"):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
-                else:                
+                else:
                     options.url = f'openai/deployments/{model}' + options.url
-        return await super().request(cast_to=cast_to, options=options, **kwargs)
-
+        return await super()._request(cast_to=cast_to, options=options, **kwargs)

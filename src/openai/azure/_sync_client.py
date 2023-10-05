@@ -384,7 +384,7 @@ class AzureOpenAIClient(Client):
     def _request(self, *, options: FinalRequestOptions, **kwargs: Any) -> Any:
         if options.url == "/images/generations":
             options.url = "openai/images/generations:submit"
-            response = super().request(httpx.Response, **kwargs)
+            response = super()._request(options=options, **kwargs)
             model_extra = cast(Mapping[str, Any], getattr(response, 'model_extra')) or {}
             operation_id = cast(str, model_extra['id'])
             return self._poll(
@@ -393,13 +393,13 @@ class AzureOpenAIClient(Client):
                 failed=lambda response: response.json()["status"] in ["failed"],
             )
         if isinstance(options.json_data, Mapping):
-            model = cast(str, options.json_data["model"])        
+            model = cast(str, options.json_data["model"])
             if not options.url.startswith(f'openai/deployments/{model}'):
                 if options.extra_json and options.extra_json.get("dataSources"):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
-                else:                
+                else:
                     options.url = f'openai/deployments/{model}' + options.url
-        return super().request(options=options, **kwargs)
+        return super()._request(options=options, **kwargs)
 
     # Internal azure specific "helper" methods
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
