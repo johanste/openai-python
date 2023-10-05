@@ -46,7 +46,11 @@ __all__ = [
 
 class OpenAI(SyncAPIClient):
     completions: resources.Completions
-    chat: resources.Chat
+
+    @property
+    def chat(self) -> resources.chat.Chat:
+        return self._chat
+    # chat: resources.chat.Chat
     edits: resources.Edits
     embeddings: resources.Embeddings
     files: resources.Files
@@ -122,7 +126,7 @@ class OpenAI(SyncAPIClient):
         self._default_stream_cls = Stream
 
         self.completions = resources.Completions(self)
-        self.chat = resources.Chat(self)
+        self._chat = resources.Chat(self)
         self.edits = resources.Edits(self)
         self.embeddings = resources.Embeddings(self)
         self.files = resources.Files(self)
@@ -244,7 +248,9 @@ class OpenAI(SyncAPIClient):
 
 class AsyncOpenAI(AsyncAPIClient):
     completions: resources.AsyncCompletions
-    chat: resources.AsyncChat
+    @property
+    def chat(self) -> resources.AsyncChat:
+        return self._chat
     edits: resources.AsyncEdits
     embeddings: resources.AsyncEmbeddings
     files: resources.AsyncFiles
@@ -320,7 +326,7 @@ class AsyncOpenAI(AsyncAPIClient):
         self._default_stream_cls = AsyncStream
 
         self.completions = resources.AsyncCompletions(self)
-        self.chat = resources.AsyncChat(self)
+        self._chat = resources.AsyncChat(self)
         self.edits = resources.AsyncEdits(self)
         self.embeddings = resources.AsyncEmbeddings(self)
         self.files = resources.AsyncFiles(self)
