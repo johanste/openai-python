@@ -362,7 +362,7 @@ class AsyncAzureOpenAIClient(AsyncClient):
     def chat(self) -> AsyncAzureChat:
         return self._chat
     
-    def __init__(self, *args: Any, credential: "TokenCredential" | None = None, api_version: str = '2023-09-01-preview', **kwargs: Any):
+    def __init__(self, *args: Any, credential: Optional["TokenCredential"] = None, api_version: str = '2023-09-01-preview', **kwargs: Any):
         default_query = kwargs.get('default_query', {})
         default_query.setdefault('api-version', api_version)
         kwargs['default_query'] = default_query
@@ -414,6 +414,7 @@ class AsyncAzureOpenAIClient(AsyncClient):
         response_json = response.json()
         return ImagesResponse.construct(**response_json["result"])
 
+    # NOTE: We override the internal method because `@overrid`ing `@overload`ed methods and keeping typing happy is a pain. Most typing tools are lacking...
     async def _request(self, cast_to: Type[ResponseT], options: FinalRequestOptions, **kwargs: Any) -> Any:
         if options.url == "/images/generations":
             options.url = "openai/images/generations:submit"
@@ -424,13 +425,12 @@ class AsyncAzureOpenAIClient(AsyncClient):
                 until=lambda response: response.json()["status"] in ["succeeded"],
                 failed=lambda response: response.json()["status"] in ["failed"],
             )
-        elif options.extra_json and options.extra_json.get("dataSources"):
-            assert isinstance(options.json_data, Mapping)
-            model = cast(str, options.json_data["model"])
-            options.url = f'openai/deployments/{model}/extensions' + options.url
-        else:
-            assert isinstance(options.json_data, Mapping)
-            model = cast(str, options.json_data["model"])
-            options.url = f'openai/deployments/{model}' + options.url
+        if isinstance(options.json_data, Mapping):
+            model = cast(str, options.json_data["model"])        
+            if not options.url.startswith(f'openai/deployments/{model}'):
+                if options.extra_json and options.extra_json.get("dataSources"):
+                    options.url = f'openai/deployments/{model}/extensions' + options.url
+                else:                
+                    options.url = f'openai/deployments/{model}' + options.url
         return await super().request(cast_to=cast_to, options=options, **kwargs)
 

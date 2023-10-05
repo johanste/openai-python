@@ -364,14 +364,14 @@ class AzureOpenAIClient(Client):
     def chat(self) -> AzureChat:
         return self._chat
     
-    def __init__(self, *args: Any, credential: "TokenCredential" | None = None, api_version: str = '2023-09-01-preview', **kwargs: Any):
+    def __init__(self, *args: Any, base_url: str, credential: Optional["TokenCredential"] = None, api_version: str = '2023-09-01-preview', **kwargs: Any):
         default_query = kwargs.get('default_query', {})
         default_query.setdefault('api-version', api_version)
         kwargs['default_query'] = default_query
         self.credential = credential
         if credential:
             kwargs['api_key'] = 'Placeholder: AAD' # TODO: There is an assumption/validation there is always an API key.
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, base_url=base_url, **kwargs)
         self._chat = AzureChat(self)
 
     @property
@@ -380,7 +380,7 @@ class AzureOpenAIClient(Client):
             return { 'Authorization': f'Bearer {self.credential.get_token()}'}
         return {"api-key": self.api_key}
 
-    # NOTE: We override the internal method because overriding overloaded methods and keeping typing happy is a pain. Most typing tools are lacking...
+    # NOTE: We override the internal method because `@overrid`ing `@overload`ed methods and keeping typing happy is a pain. Most typing tools are lacking...
     def _request(self, *, options: FinalRequestOptions, **kwargs: Any) -> Any:
         if options.url == "/images/generations":
             options.url = "openai/images/generations:submit"
@@ -392,14 +392,13 @@ class AzureOpenAIClient(Client):
                 until=lambda response: response.json()["status"] in ["succeeded"],
                 failed=lambda response: response.json()["status"] in ["failed"],
             )
-        if options.extra_json and options.extra_json.get("dataSources"):
-            assert isinstance(options.json_data, Mapping)
-            model = cast(str, options.json_data["model"])
-            options.url = f'openai/deployments/{model}/extensions' + options.url
-        else:
-            assert isinstance(options.json_data, Mapping)
-            model = cast(str, options.json_data["model"])
-            options.url = f'openai/deployments/{model}' + options.url
+        if isinstance(options.json_data, Mapping):
+            model = cast(str, options.json_data["model"])        
+            if not options.url.startswith(f'openai/deployments/{model}'):
+                if options.extra_json and options.extra_json.get("dataSources"):
+                    options.url = f'openai/deployments/{model}/extensions' + options.url
+                else:                
+                    options.url = f'openai/deployments/{model}' + options.url
         return super().request(options=options, **kwargs)
 
     # Internal azure specific "helper" methods
