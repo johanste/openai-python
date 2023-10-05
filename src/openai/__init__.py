@@ -18,7 +18,7 @@ from ._client import (
     AsyncStream,
     RequestOptions,
 )
-from .azure import AzureClient, AzureAsyncClient
+from .azure import AzureOpenAIClient, AsyncAzureOpenAIClient
 from ._version import __title__, __version__
 from ._exceptions import (
     APIError,
@@ -67,8 +67,8 @@ __all__ = [
     "OpenAI",
     "AsyncOpenAI",
     "file_from_path",
-    "AzureClient",
-    "AzureAsyncClient"
+    "AzureOpenAIClient",
+    "AsyncAzureOpenAIClient"
 ]
 
 from .version import VERSION as VERSION
