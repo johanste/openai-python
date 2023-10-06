@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing_extensions import Literal, override
 from typing import Any, Callable, cast, List, Mapping, Dict, Optional, overload, Union
 import time
@@ -15,12 +17,13 @@ from openai._types import NotGiven, NOT_GIVEN, Headers, Query, Body
 from openai._streaming import Stream
 
 from openai.resources.chat import Chat, Completions
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletion, ChatCompletionChunk
 from openai.types.chat.completion_create_params import FunctionCall, Function
+from openai.types.completion import Completion as _Completion
 
 # Azure specific types
 from ._credential import TokenCredential
-from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk
+from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk, Completion
 
 TIMEOUT_SECS = 600
 
@@ -334,32 +337,35 @@ class AzureCompletions(Completions):
         stream_dict: Dict[str, Literal[True]] = { # TODO: pylance is upset if I pass through the parameter value. Overload + override combination is problematic
             "stream": True
         } if stream else {}
-        response = super().create(
-            messages=messages,
-            model=model,
-            frequency_penalty = frequency_penalty,
-            function_call=function_call,
-            functions=functions,
-            logit_bias=logit_bias,
-            max_tokens=max_tokens,
-            n=n,
-            presence_penalty=presence_penalty,
-            stop=stop,
-            **stream_dict,
-            temperature=temperature,
-            top_p=top_p,
-            user=user,
-            extra_headers=extra_headers,
-            extra_query=extra_query,
-            extra_body=extra_body,
-            timeout=timeout
+        response = cast(
+            Union[ChatCompletion, Stream[ChatCompletionChunk]],
+            super().create(
+                messages=messages,
+                model=model,
+                frequency_penalty = frequency_penalty,
+                function_call=function_call,
+                functions=functions,
+                logit_bias=logit_bias,
+                max_tokens=max_tokens,
+                n=n,
+                presence_penalty=presence_penalty,
+                stop=stop,
+                **stream_dict,
+                temperature=temperature,
+                top_p=top_p,
+                user=user,
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout
+            )
         )
         if isinstance(response, Stream):
             response._cast_to = AzureChatCompletionChunk  # or rebuild the stream?
         else:
             response_json = response.model_dump(mode="json")
             response = AzureChatCompletion.construct(**response_json)
-        return response
+        return response  # type: ignore
 
 
 class AzureOpenAIClient(Client):
@@ -368,7 +374,7 @@ class AzureOpenAIClient(Client):
     @override
     def chat(self) -> AzureChat:
         return self._chat
-    
+
     def __init__(self, *args: Any, base_url: str, credential: Optional["TokenCredential"] = None, api_version: str = '2023-09-01-preview', **kwargs: Any):
         default_query = kwargs.get('default_query', {})
         default_query.setdefault('api-version', api_version)
@@ -404,7 +410,17 @@ class AzureOpenAIClient(Client):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
                 else:
                     options.url = f'openai/deployments/{model}' + options.url
-        return super()._request(options=options, **kwargs)
+        response = super()._request(options=options, **kwargs)
+        # TODO: cheating here by "aliasing" azure's completion type to a Completion
+        # because I don't want to redefine the method on the client
+        if isinstance(response, Stream):
+            if isinstance(response._cast_to, type(_Completion)):
+                response._cast_to = Completion
+        if isinstance(response, _Completion):
+            response_json = response.model_dump(mode="json")
+            response = Completion.construct(**response_json)
+        return response  # type: ignore
+
 
     # Internal azure specific "helper" methods
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
@@ -441,4 +457,3 @@ class AzureOpenAIClient(Client):
 
         response_json = response.json()
         return ImagesResponse.construct(**response_json["result"])
-

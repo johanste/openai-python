@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing_extensions import Literal, override
 from typing import Any, Callable, cast, List, Mapping, Dict, Optional, overload, Type, Union
 import time
@@ -7,8 +9,9 @@ import httpx
 from openai import AsyncClient, OpenAIError
 from openai.resources.chat import AsyncChat, AsyncCompletions
 from openai.types import ImagesResponse
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletion, ChatCompletionChunk
 from openai.types.chat.completion_create_params import FunctionCall, Function
+from openai.types.completion import Completion as _Completion
 
 # These types are needed for correct typing of overrides
 from openai._types import NotGiven, NOT_GIVEN, Headers, Query, Body, ResponseT
@@ -19,7 +22,7 @@ from openai._streaming import AsyncStream
 
 # Azure specific types
 from ._credential import TokenCredential
-from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk
+from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk, Completion
 
 TIMEOUT_SECS = 600
 
@@ -333,32 +336,35 @@ class AsyncAzureCompletions(AsyncCompletions):
         stream_dict: Dict[str, Literal[True]] = { # TODO: pylance is upset if I pass through the parameter value. Overload + override combination is problematic
             "stream": True
         } if stream else {}
-        response = await super().create(
-            messages=messages,
-            model=model,
-            frequency_penalty = frequency_penalty,
-            function_call=function_call,
-            functions=functions,
-            logit_bias=logit_bias,
-            max_tokens=max_tokens,
-            n=n,
-            presence_penalty=presence_penalty,
-            stop=stop,
-            **stream_dict,
-            temperature=temperature,
-            top_p=top_p,
-            user=user,
-            extra_headers=extra_headers,
-            extra_query=extra_query,
-            extra_body=extra_body,
-            timeout=timeout
+        response = cast(
+            Union[ChatCompletion, ChatCompletionChunk],
+            await super().create(
+                messages=messages,
+                model=model,
+                frequency_penalty = frequency_penalty,
+                function_call=function_call,
+                functions=functions,
+                logit_bias=logit_bias,
+                max_tokens=max_tokens,
+                n=n,
+                presence_penalty=presence_penalty,
+                stop=stop,
+                **stream_dict,
+                temperature=temperature,
+                top_p=top_p,
+                user=user,
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout
+            )
         )
         if isinstance(response, AsyncStream):
             response._cast_to = AzureChatCompletionChunk  # or rebuild the stream?
         else:
             response_json = response.model_dump(mode="json")
             response = AzureChatCompletion.construct(**response_json)
-        return response
+        return response  # type: ignore
 
 
 class AsyncAzureOpenAIClient(AsyncClient):
@@ -439,4 +445,14 @@ class AsyncAzureOpenAIClient(AsyncClient):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
                 else:
                     options.url = f'openai/deployments/{model}' + options.url
-        return await super()._request(cast_to=cast_to, options=options, **kwargs)
+            
+        response = await super()._request(cast_to=cast_to, options=options, **kwargs)
+        # TODO: cheating here by "aliasing" azure's completion type to a Completion
+        # because I don't want to redefine the method on the client
+        if isinstance(response, AsyncStream):
+            if isinstance(response._cast_to, type(_Completion)):
+                response._cast_to = Completion
+        if isinstance(response, _Completion):
+            response_json = response.model_dump(mode="json")
+            response = Completion.construct(**response_json)
+        return response  # type: ignore
