@@ -19,7 +19,7 @@ from openai.types.chat import ChatCompletionMessageParam, ChatCompletion, ChatCo
 from openai.types.chat.completion_create_params import FunctionCall, Function
 
 # Azure specific types
-from ._credential import TokenCredential
+from ._credential import TokenCredential, TokenAuth
 from ._azuremodels import ChatExtensionConfiguration
 
 TIMEOUT_SECS = 600
@@ -376,9 +376,12 @@ class AzureOpenAIClient(Client):
 
     @property
     def auth_headers(self) -> Dict[str, str]:
-        if self.credential:
-            return { 'Authorization': f'Bearer {self.credential.get_token()}'}
         return {"api-key": self.api_key}
+
+    @property
+    def custom_auth(self) -> httpx.Auth | None:
+        if self.credential:
+            return TokenAuth(self.credential)
 
     # NOTE: We override the internal method because `@overrid`ing `@overload`ed methods and keeping typing happy is a pain. Most typing tools are lacking...
     def _request(self, *, options: FinalRequestOptions, **kwargs: Any) -> Any:

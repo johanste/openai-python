@@ -18,7 +18,7 @@ from openai._models import FinalRequestOptions
 from openai._streaming import AsyncStream
 
 # Azure specific types
-from ._credential import TokenCredential
+from ._credential import TokenCredential, TokenAuth
 from ._azuremodels import ChatExtensionConfiguration
 
 TIMEOUT_SECS = 600
@@ -374,10 +374,12 @@ class AsyncAzureOpenAIClient(AsyncClient):
 
     @property
     def auth_headers(self) -> Dict[str, str]:
-        if self.credential:
-            return { 'Authorization': f'Bearer {self.credential.get_token()}'}
         return {"api-key": self.api_key}
 
+    @property
+    def custom_auth(self) -> httpx.Auth | None:
+        if self.credential:
+            return TokenAuth(self.credential)
 
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
         if not predicate(response):
