@@ -22,7 +22,7 @@ from openai.types.chat.completion_create_params import FunctionCall, Function
 from openai.types.completion import Completion as _Completion
 
 # Azure specific types
-from ._credential import TokenCredential
+from ._credential import TokenCredential, TokenAuth
 from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk, Completion
 
 TIMEOUT_SECS = 600
@@ -387,9 +387,12 @@ class AzureOpenAIClient(Client):
 
     @property
     def auth_headers(self) -> Dict[str, str]:
-        if self.credential:
-            return { 'Authorization': f'Bearer {self.credential.get_token()}'}
         return {"api-key": self.api_key}
+
+    @property
+    def custom_auth(self) -> httpx.Auth | None:
+        if self.credential:
+            return TokenAuth(self.credential)
 
     # NOTE: We override the internal method because `@overrid`ing `@overload`ed methods and keeping typing happy is a pain. Most typing tools are lacking...
     def _request(self, *, options: FinalRequestOptions, **kwargs: Any) -> Any:
@@ -410,6 +413,8 @@ class AzureOpenAIClient(Client):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
                 else:
                     options.url = f'openai/deployments/{model}' + options.url
+        if options.url.startswith(("/models", "/fine_tuning", "/files", "/fine-tunes")):
+            options.url = f"openai{options.url}"
         response = super()._request(options=options, **kwargs)
         # TODO: cheating here by "aliasing" azure's completion type to a Completion
         # because I don't want to redefine the method on the client
@@ -420,7 +425,6 @@ class AzureOpenAIClient(Client):
             response_json = response.model_dump(mode="json")
             response = Completion.construct(**response_json)
         return response  # type: ignore
-
 
     # Internal azure specific "helper" methods
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:

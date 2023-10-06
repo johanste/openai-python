@@ -21,7 +21,7 @@ from openai._models import FinalRequestOptions
 from openai._streaming import AsyncStream
 
 # Azure specific types
-from ._credential import TokenCredential
+from ._credential import TokenCredential, TokenAuth
 from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk, Completion
 
 TIMEOUT_SECS = 600
@@ -386,10 +386,12 @@ class AsyncAzureOpenAIClient(AsyncClient):
 
     @property
     def auth_headers(self) -> Dict[str, str]:
-        if self.credential:
-            return { 'Authorization': f'Bearer {self.credential.get_token()}'}
         return {"api-key": self.api_key}
 
+    @property
+    def custom_auth(self) -> httpx.Auth | None:
+        if self.credential:
+            return TokenAuth(self.credential)
 
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
         if not predicate(response):
@@ -445,7 +447,8 @@ class AsyncAzureOpenAIClient(AsyncClient):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
                 else:
                     options.url = f'openai/deployments/{model}' + options.url
-            
+        if options.url.startswith(("/models", "/fine_tuning", "/files", "/fine-tunes")):
+            options.url = f"openai{options.url}"
         response = await super()._request(cast_to=cast_to, options=options, **kwargs)
         # TODO: cheating here by "aliasing" azure's completion type to a Completion
         # because I don't want to redefine the method on the client
