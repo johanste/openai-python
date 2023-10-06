@@ -7,7 +7,7 @@ import httpx
 from openai import AsyncClient, OpenAIError
 from openai.resources.chat import AsyncChat, AsyncCompletions
 from openai.types import ImagesResponse
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletion, ChatCompletionChunk
+from openai.types.chat import ChatCompletionMessageParam
 from openai.types.chat.completion_create_params import FunctionCall, Function
 
 # These types are needed for correct typing of overrides
@@ -19,7 +19,7 @@ from openai._streaming import AsyncStream
 
 # Azure specific types
 from ._credential import TokenCredential
-from ._azuremodels import ChatExtensionConfiguration
+from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk
 
 TIMEOUT_SECS = 600
 
@@ -74,7 +74,7 @@ class AsyncAzureCompletions(AsyncCompletions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> ChatCompletion:
+    ) -> AzureChatCompletion:
         """
         Creates a model response for the given chat conversation.
 
@@ -200,7 +200,7 @@ class AsyncAzureCompletions(AsyncCompletions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AsyncStream[ChatCompletionChunk]:
+    ) -> AsyncStream[AzureChatCompletionChunk]:
         """
         Creates a model response for the given chat conversation.
 
@@ -325,7 +325,7 @@ class AsyncAzureCompletions(AsyncCompletions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> ChatCompletion | AsyncStream[ChatCompletionChunk]:
+    ) -> AzureChatCompletion | AsyncStream[AzureChatCompletionChunk]:
         if data_sources:
             if extra_body is None:
                 extra_body= {}
@@ -353,7 +353,13 @@ class AsyncAzureCompletions(AsyncCompletions):
             extra_body=extra_body,
             timeout=timeout
         )
+        if isinstance(response, AsyncStream):
+            response._cast_to = AzureChatCompletionChunk  # or rebuild the stream?
+        else:
+            response_json = response.model_dump(mode="json")
+            response = AzureChatCompletion.construct(**response_json)
         return response
+
 
 class AsyncAzureOpenAIClient(AsyncClient):
 

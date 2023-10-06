@@ -15,12 +15,12 @@ from openai._types import NotGiven, NOT_GIVEN, Headers, Query, Body
 from openai._streaming import Stream
 
 from openai.resources.chat import Chat, Completions
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletion, ChatCompletionChunk
+from openai.types.chat import ChatCompletionMessageParam
 from openai.types.chat.completion_create_params import FunctionCall, Function
 
 # Azure specific types
 from ._credential import TokenCredential
-from ._azuremodels import ChatExtensionConfiguration
+from ._azuremodels import ChatExtensionConfiguration, AzureChatCompletion, AzureChatCompletionChunk
 
 TIMEOUT_SECS = 600
 
@@ -75,7 +75,7 @@ class AzureCompletions(Completions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> ChatCompletion:
+    ) -> AzureChatCompletion:
         """
         Creates a model response for the given chat conversation.
 
@@ -201,7 +201,7 @@ class AzureCompletions(Completions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> Stream[ChatCompletionChunk]:
+    ) -> Stream[AzureChatCompletionChunk]:
         """
         Creates a model response for the given chat conversation.
 
@@ -326,7 +326,7 @@ class AzureCompletions(Completions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> ChatCompletion | Stream[ChatCompletionChunk]:
+    ) -> AzureChatCompletion | Stream[AzureChatCompletionChunk]:
         if data_sources:
             if extra_body is None:
                 extra_body= {}
@@ -354,6 +354,11 @@ class AzureCompletions(Completions):
             extra_body=extra_body,
             timeout=timeout
         )
+        if isinstance(response, Stream):
+            response._cast_to = AzureChatCompletionChunk  # or rebuild the stream?
+        else:
+            response_json = response.model_dump(mode="json")
+            response = AzureChatCompletion.construct(**response_json)
         return response
 
 
