@@ -1,10 +1,11 @@
 from typing_extensions import Literal, override
 from typing import Any, Callable, cast, List, Mapping, Dict, Optional, overload, Union
 import time
+import json
 
 import httpx
 
-from openai import Client, OpenAIError
+from openai import Client, OpenAIError, BadRequestError
 from openai.types import ImagesResponse
 
 # These are types used in the public API surface area that are not exported as public
@@ -21,6 +22,7 @@ from openai.types.chat.completion_create_params import FunctionCall, Function
 # Azure specific types
 from ._credential import TokenCredential, TokenAuth
 from ._azuremodels import ChatExtensionConfiguration
+from ._exceptions import ContentPolicyError
 
 TIMEOUT_SECS = 600
 
@@ -402,7 +404,21 @@ class AzureOpenAIClient(Client):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
                 else:
                     options.url = f'openai/deployments/{model}' + options.url
-        return super()._request(options=options, **kwargs)
+        try:
+            return super()._request(options=options, **kwargs)
+        except BadRequestError as err:
+            try:
+                body = json.loads(err.response.text)
+            except Exception:
+                raise err
+            
+            if body.get('error') and body['error'].get('code') == 'content_filter':
+                raise ContentPolicyError(
+                    message=err.message,
+                    response=err.response,
+                    body=body
+                )
+            raise err
 
     # Internal azure specific "helper" methods
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
