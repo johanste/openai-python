@@ -1,6 +1,7 @@
 from typing_extensions import Literal, override
 from typing import Any, Callable, cast, List, Mapping, Dict, Optional, overload, Union
 import time
+import json
 
 import httpx
 
@@ -380,26 +381,35 @@ class AzureOpenAIClient(Client):
             return { 'Authorization': f'Bearer {self.credential.get_token()}'}
         return {"api-key": self.api_key}
 
+    def _prepare_request(self, request: httpx.Request) -> None:
+        # TODO: need confirmation that it is okay to override this
+        # TODO: url building feels hacky - do better
+        try:
+            content = json.loads(request.content)
+        except json.JSONDecodeError:
+            return
+        url = request.url
+        #  TODO: url building feels hacky - do better
+        if content.get("dataSources"):
+            request.url = httpx.URL(f"{url.scheme}://" + url.host + f"/openai/deployments/{content['model']}/extensions" + url.path + f"?{url.query.decode()}")
+        elif request.url.path == "/images/generations":
+            request.url = httpx.URL(f"{url.scheme}://" + url.host + "/openai/images/generations:submit?" + f"{url.query.decode()}")
+        elif content.get("model"):
+            request.url = httpx.URL(f"{url.scheme}://" + url.host + f"/openai/deployments/{content['model']}" + url.path + f"?{url.query.decode()}")
+
     # NOTE: We override the internal method because `@overrid`ing `@overload`ed methods and keeping typing happy is a pain. Most typing tools are lacking...
     def _request(self, *, options: FinalRequestOptions, **kwargs: Any) -> Any:
-        if options.url == "/images/generations":
-            options.url = "openai/images/generations:submit"
-            response = super()._request(options=options, **kwargs)
+        response = super()._request(options=options, **kwargs)
+        if isinstance(response, ImagesResponse):
             model_extra = cast(Mapping[str, Any], getattr(response, 'model_extra')) or {}
-            operation_id = cast(str, model_extra['id'])
-            return self._poll(
-                "get", f"openai/operations/images/{operation_id}",
-                until=lambda response: response.json()["status"] in ["succeeded"],
-                failed=lambda response: response.json()["status"] in ["failed"],
-            )
-        if isinstance(options.json_data, Mapping):
-            model = cast(str, options.json_data["model"])
-            if not options.url.startswith(f'openai/deployments/{model}'):
-                if options.extra_json and options.extra_json.get("dataSources"):
-                    options.url = f'openai/deployments/{model}/extensions' + options.url
-                else:
-                    options.url = f'openai/deployments/{model}' + options.url
-        return super()._request(options=options, **kwargs)
+            if model_extra.get("id"):
+                operation_id = cast(str, model_extra['id'])
+                return self._poll(
+                    "get", f"openai/operations/images/{operation_id}",
+                    until=lambda response: response.json()["status"] in ["succeeded"],
+                    failed=lambda response: response.json()["status"] in ["failed"],
+                )
+        return response
 
     # Internal azure specific "helper" methods
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
