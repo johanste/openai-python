@@ -381,18 +381,23 @@ class AsyncAzureOpenAIClient(AsyncClient):
 
     def _prepare_request(self, request: httpx.Request) -> None:
         # TODO: need confirmation that it is okay to override this
-        # TODO: url building feels hacky - do better
+        url = request.url
+        if url.path.startswith("/audio"):
+            model_name = request.stream.fields[0].value  # is this a robust way to extract model name?
+            request.url = url.copy_with(path=f"/openai/deployments/{model_name}{url.path}")
+            return
+
         try:
             content = json.loads(request.content)
         except json.JSONDecodeError:
             return
-        url = request.url
+
         if content.get("dataSources"):
-            request.url = httpx.URL(f"{url.scheme}://" + url.host + f"/openai/deployments/{content['model']}/extensions" + url.path + f"?{url.query.decode()}")
+            request.url = url.copy_with(path=f"/openai/deployments/{content['model']}/extensions{url.path}")
         elif request.url.path == "/images/generations":
-            request.url = httpx.URL(f"{url.scheme}://" + url.host + "/openai/images/generations:submit?" + f"{url.query.decode()}")
+            request.url = url.copy_with(path="/openai/images/generations:submit")
         elif content.get("model"):
-            request.url = httpx.URL(f"{url.scheme}://" + url.host + f"/openai/deployments/{content['model']}" + url.path + f"?{url.query.decode()}")
+            request.url = url.copy_with(path=f"/openai/deployments/{content['model']}{url.path}")
 
     def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
         if not predicate(response):
