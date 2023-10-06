@@ -402,6 +402,8 @@ class AzureOpenAIClient(Client):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
                 else:
                     options.url = f'openai/deployments/{model}' + options.url
+        if options.url.startswith(("/models", "/fine_tuning", "/files", "/fine-tunes")):
+            options.url = f"openai{options.url}"
         return super()._request(options=options, **kwargs)
 
     # Internal azure specific "helper" methods

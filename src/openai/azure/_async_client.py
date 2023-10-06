@@ -435,4 +435,6 @@ class AsyncAzureOpenAIClient(AsyncClient):
                     options.url = f'openai/deployments/{model}/extensions' + options.url
                 else:
                     options.url = f'openai/deployments/{model}' + options.url
+        if options.url.startswith(("/models", "/fine_tuning", "/files", "/fine-tunes")):
+            options.url = f"openai{options.url}"
         return await super()._request(cast_to=cast_to, options=options, **kwargs)
