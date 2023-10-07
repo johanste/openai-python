@@ -5,8 +5,8 @@ from openai._models import BaseModel as BaseModel
 from openai.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as ChatChoice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as ChatChoiceDelta
-from openai.types.completion import Completion as _Completion
-from openai.types.completion_choice import CompletionChoice as _CompletionChoice
+from openai.types.completion import Completion
+from openai.types.completion_choice import CompletionChoice
 
 
 AzureChatCompletionRole = Literal["system", "user", "assistant", "function", "tool"]
@@ -73,10 +73,10 @@ class AzureChatCompletionChunk(ChatCompletionChunk):
     prompt_filter_results: Optional[List[PromptFilterResult]]
 
 
-class CompletionChoice(_CompletionChoice):
+class AzureCompletionChoice(CompletionChoice):
     content_filter_results: Optional[ContentFilterResults]
 
 
-class Completion(_Completion):
-    choices: List[CompletionChoice]  # type: ignore
+class AzureCompletion(Completion):
+    choices: List[AzureCompletionChoice]  # type: ignore
     prompt_filter_results: Optional[List[PromptFilterResult]]
