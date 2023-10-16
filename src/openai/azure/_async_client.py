@@ -27,6 +27,7 @@ from ._azuremodels import (
     AzureChatCompletionChunk,
     AzureCompletion,
 )
+from ._streaming import AzureAsyncStream
 
 
 class AsyncAzureChat(AsyncChat):
@@ -207,7 +208,7 @@ class AsyncAzureChatCompletions(AsyncCompletions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AsyncStream[AzureChatCompletionChunk]:
+    ) -> AzureAsyncStream[AzureChatCompletionChunk]:
         """
         Creates a model response for the given chat conversation.
 
@@ -332,7 +333,7 @@ class AsyncAzureChatCompletions(AsyncCompletions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureChatCompletion | AsyncStream[AzureChatCompletionChunk]:
+    ) -> AzureChatCompletion | AzureAsyncStream[AzureChatCompletionChunk]:
         if data_sources:
             if extra_body is None:
                 extra_body= {}
@@ -341,7 +342,7 @@ class AsyncAzureChatCompletions(AsyncCompletions):
             "stream": True
         } if stream else {}
         response = cast(
-            Union[ChatCompletion, ChatCompletionChunk],
+            Union[ChatCompletion, AsyncStream[ChatCompletionChunk]],
             await super().create(
                 messages=messages,
                 model=model,
@@ -364,7 +365,10 @@ class AsyncAzureChatCompletions(AsyncCompletions):
             )
         )
         if isinstance(response, AsyncStream):
-            response._cast_to = AzureChatCompletionChunk  # or rebuild the stream?
+            response = AzureAsyncStream[AzureChatCompletionChunk](
+                cast_to=AzureChatCompletionChunk,
+                response=response.response,
+            )
         else:
             response_json = response.model_dump(mode="json")
             response = AzureChatCompletion.construct(**response_json)
@@ -566,7 +570,7 @@ class AsyncAzureCompletions(AsyncCompletionsOperations):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AsyncStream[AzureCompletion]:
+    ) -> AzureAsyncStream[AzureCompletion]:
         """
         Creates a completion for the provided prompt and parameters.
 
@@ -720,7 +724,7 @@ class AsyncAzureCompletions(AsyncCompletionsOperations):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureCompletion | AsyncStream[AzureCompletion]:
+    ) -> AzureCompletion | AzureAsyncStream[AzureCompletion]:
         stream_dict: Dict[str, Literal[True]] = { # TODO: pylance is upset if I pass through the parameter value. Overload + override combination is problematic
             "stream": True
         } if stream else {}
@@ -751,7 +755,10 @@ class AsyncAzureCompletions(AsyncCompletionsOperations):
         )
 
         if isinstance(response, AsyncStream):
-            response._cast_to = AzureCompletion
+            response = AzureAsyncStream[AzureCompletion](
+                cast_to=AzureCompletion,
+                response=response.response,
+            )
         else:
             response_json = response.model_dump(mode="json")
             response = AzureCompletion.construct(**response_json)
