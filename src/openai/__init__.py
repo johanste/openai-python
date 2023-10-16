@@ -66,7 +66,7 @@ __all__ = [
     "AsyncStream",
     "OpenAI",
     "AsyncOpenAI",
-    "file_from_path",
+    "file_from_path"
 ]
 
 from .version import VERSION as VERSION

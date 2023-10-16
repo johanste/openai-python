@@ -14,16 +14,22 @@ __all__ = ["Chat", "AsyncChat"]
 
 
 class Chat(SyncAPIResource):
-    completions: Completions
+
+    @property
+    def completions(self) -> Completions:
+        return self._completions
 
     def __init__(self, client: OpenAI) -> None:
         super().__init__(client)
-        self.completions = Completions(client)
+        self._completions = Completions(client)
 
 
 class AsyncChat(AsyncAPIResource):
-    completions: AsyncCompletions
-
+    
+    @property
+    def completions(self) -> AsyncCompletions:
+        return self._completions
+    
     def __init__(self, client: AsyncOpenAI) -> None:
         super().__init__(client)
-        self.completions = AsyncCompletions(client)
+        self._completions = AsyncCompletions(client)
