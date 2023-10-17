@@ -1,17 +1,11 @@
 from __future__ import annotations
 
 from typing_extensions import Literal, override
-from typing import Any, Callable, cast, List, Mapping, Dict, Optional, overload, Union
-import time
+from typing import Any, cast, List, Dict, Optional, overload, Union, Iterable
 
 import httpx
 
-from openai import Client, OpenAIError
-from openai.types import ImagesResponse
-
-# These are types used in the public API surface area that are not exported as public
-from openai._models import FinalRequestOptions
-
+from openai import Client
 # These types are needed for correct typing of overrides
 from openai._types import NotGiven, NOT_GIVEN, Headers, Query, Body
 from openai._streaming import Stream
@@ -26,12 +20,11 @@ from openai.types.completion import Completion
 from ._credential import TokenCredential, TokenAuth
 from ._azuremodels import (
     ChatExtensionConfiguration,
-    AzureChatCompletion, 
+    AzureChatCompletion,
     AzureChatCompletionChunk,
     AzureCompletion,
 )
 
-TIMEOUT_SECS = 600
 
 class AzureChat(Chat):
 
@@ -211,7 +204,7 @@ class AzureChatCompletions(Completions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> Stream[AzureChatCompletionChunk]:
+    ) -> Iterable[AzureChatCompletionChunk]:
         """
         Creates a model response for the given chat conversation.
 
@@ -336,7 +329,7 @@ class AzureChatCompletions(Completions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureChatCompletion | Stream[AzureChatCompletionChunk]:
+    ) -> AzureChatCompletion | Iterable[AzureChatCompletionChunk]:
         if data_sources:
             if extra_body is None:
                 extra_body= {}
@@ -368,11 +361,14 @@ class AzureChatCompletions(Completions):
             )
         )
         if isinstance(response, Stream):
-            response._cast_to = AzureChatCompletionChunk  # or rebuild the stream?
+            yield from (
+                AzureChatCompletionChunk.construct(**completion.model_dump(mode="json"))
+                for completion in response
+            )
         else:
             response_json = response.model_dump(mode="json")
             response = AzureChatCompletion.construct(**response_json)
-        return response  # type: ignore
+            return response  # type: ignore
 
 
 class AzureCompletions(CompletionsOperations):
@@ -570,7 +566,7 @@ class AzureCompletions(CompletionsOperations):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> Stream[AzureCompletion]:
+    ) -> Iterable[AzureCompletion]:
         """
         Creates a completion for the provided prompt and parameters.
 
@@ -724,7 +720,7 @@ class AzureCompletions(CompletionsOperations):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureCompletion | Stream[AzureCompletion]:
+    ) -> AzureCompletion | Iterable[AzureCompletion]:
         stream_dict: Dict[str, Literal[True]] = { # TODO: pylance is upset if I pass through the parameter value. Overload + override combination is problematic
             "stream": True
         } if stream else {}
@@ -755,11 +751,14 @@ class AzureCompletions(CompletionsOperations):
         )
 
         if isinstance(response, Stream):
-            response._cast_to = AzureCompletion
+            yield from (
+                AzureCompletion.construct(**completion.model_dump(mode="json"))
+                for completion in response
+            )
         else:
             response_json = response.model_dump(mode="json")
             response = AzureCompletion.construct(**response_json)
-        return response  # type: ignore
+            return response  # type: ignore
 
 
 class AzureOpenAIClient(Client):
@@ -778,14 +777,22 @@ class AzureOpenAIClient(Client):
     def completions(self, value: AzureCompletions) -> None:
         self._completions = value
 
-    def __init__(self, *args: Any, base_url: str, credential: Optional["TokenCredential"] = None, api_version: str = '2023-09-01-preview', **kwargs: Any):
+    @overload
+    def __init__(self, *, base_url: str, api_key: str, api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
+        ...
+
+    @overload
+    def __init__(self, *, base_url: str, credential: "TokenCredential", api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
+        ...
+
+    def __init__(self, **kwargs: Any) -> None:
         default_query = kwargs.get('default_query', {})
-        default_query.setdefault('api-version', api_version)
+        default_query.setdefault('api-version', kwargs.pop("api_version", '2023-09-01-preview'))
         kwargs['default_query'] = default_query
-        self.credential = credential
-        if credential:
+        self.credential = kwargs.pop("credential", None)
+        if self.credential:
             kwargs['api_key'] = 'Placeholder: AAD' # TODO: There is an assumption/validation there is always an API key.
-        super().__init__(*args, base_url=base_url, **kwargs)
+        super().__init__(**kwargs)
         self._chat = AzureChat(self)
 
     @property
@@ -796,62 +803,3 @@ class AzureOpenAIClient(Client):
     def custom_auth(self) -> httpx.Auth | None:
         if self.credential:
             return TokenAuth(self.credential)
-
-    # NOTE: We override the internal method because `@overrid`ing `@overload`ed methods and keeping typing happy is a pain. Most typing tools are lacking...
-    def _request(self, *, options: FinalRequestOptions, **kwargs: Any) -> Any:
-        if options.url == "/images/generations":
-            options.url = "openai/images/generations:submit"
-            response = super()._request(options=options, **kwargs)
-            model_extra = cast(Mapping[str, Any], getattr(response, 'model_extra')) or {}
-            operation_id = cast(str, model_extra['id'])
-            return self._poll(
-                "get", f"openai/operations/images/{operation_id}",
-                until=lambda response: response.json()["status"] in ["succeeded"],
-                failed=lambda response: response.json()["status"] in ["failed"],
-            )
-        if isinstance(options.json_data, Mapping):
-            model = cast(str, options.json_data["model"])
-            if not options.url.startswith(f'openai/deployments/{model}'):
-                if options.extra_json and options.extra_json.get("dataSources"):
-                    options.url = f'openai/deployments/{model}/extensions' + options.url
-                else:
-                    options.url = f'openai/deployments/{model}' + options.url
-        if options.url.startswith(("/models", "/fine_tuning", "/files", "/fine-tunes")):
-            options.url = f"openai{options.url}"
-        return super()._request(options=options, **kwargs)
-
-    # Internal azure specific "helper" methods
-    def _check_polling_response(self, response: httpx.Response, predicate: Callable[[httpx.Response], bool]) -> bool:
-        if not predicate(response):
-            return False
-        error_data = cast(Dict[str, Any], response.json()['error'])
-        message = error_data.get('message', 'Operation failed')
-        code = error_data.get('code')
-        raise OpenAIError(message, code)
-
-    def _poll(
-        self,
-        method: str,
-        url: str,
-        until: Callable[[httpx.Response], bool],
-        failed: Callable[[httpx.Response], bool],
-        interval: Optional[float] = None,
-        delay: Optional[float] = None,
-    ) -> ImagesResponse:
-        if delay:
-            time.sleep(delay)
-
-        opts = FinalRequestOptions.construct(method=method, url=url)
-        response = super().request(httpx.Response, opts)
-        self._check_polling_response(response, failed)
-        start_time = time.time()
-        while not until(response):
-            if time.time() - start_time > TIMEOUT_SECS:
-                raise OpenAIError("Operation polling timed out.") # TODO: Find the right exception
-
-            time.sleep(interval or int(response.headers.get("retry-after")) or 10)
-            response = super().request(httpx.Response, opts)
-            self._check_polling_response(response, failed)
-
-        response_json = response.json()
-        return ImagesResponse.construct(**response_json["result"])
