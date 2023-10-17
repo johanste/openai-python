@@ -785,11 +785,11 @@ class AsyncAzureOpenAIClient(AsyncClient):
         self._completions = value
 
     @overload
-    def __init__(self, base_url: str, api_key: str, api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
+    def __init__(self, *, base_url: str, api_key: str, api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
         ...
 
     @overload
-    def __init__(self, base_url: str, credential: "AsyncTokenCredential", api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
+    def __init__(self, *, base_url: str, credential: "AsyncTokenCredential", api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
         ...
 
     def __init__(self, **kwargs: Any) -> None:
