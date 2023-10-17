@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing_extensions import Literal, override
-from typing import Any, cast, List, Dict, Optional, overload, Union
+from typing import Any, cast, List, Dict, Optional, overload, Union, AsyncIterable
 
 import httpx
 
@@ -23,11 +23,14 @@ from openai._streaming import AsyncStream
 from ._credential import TokenCredential, TokenAuth
 from ._azuremodels import (
     ChatExtensionConfiguration,
-    AzureChatCompletion, 
+    AzureChatCompletion,
     AzureChatCompletionChunk,
     AzureCompletion,
 )
-from ._streaming import AzureAsyncStream
+
+async def async_iterator(response, response_cls):
+    async for result in response:
+        yield response_cls.construct(**result.model_dump(mode="json"))
 
 
 class AsyncAzureChat(AsyncChat):
@@ -208,7 +211,7 @@ class AsyncAzureChatCompletions(AsyncCompletions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureAsyncStream[AzureChatCompletionChunk]:
+    ) -> AsyncIterable[AzureChatCompletionChunk]:
         """
         Creates a model response for the given chat conversation.
 
@@ -333,7 +336,7 @@ class AsyncAzureChatCompletions(AsyncCompletions):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureChatCompletion | AzureAsyncStream[AzureChatCompletionChunk]:
+    ) -> AzureChatCompletion | AsyncIterable[AzureChatCompletionChunk]:
         if data_sources:
             if extra_body is None:
                 extra_body= {}
@@ -365,14 +368,14 @@ class AsyncAzureChatCompletions(AsyncCompletions):
             )
         )
         if isinstance(response, AsyncStream):
-            response = AzureAsyncStream[AzureChatCompletionChunk](
-                cast_to=AzureChatCompletionChunk,
-                response=response.response,
+            return async_iterator(
+                response=response,
+                response_cls=AzureChatCompletionChunk
             )
         else:
             response_json = response.model_dump(mode="json")
             response = AzureChatCompletion.construct(**response_json)
-        return response  # type: ignore
+            return response  # type: ignore
 
 
 class AsyncAzureCompletions(AsyncCompletionsOperations):
@@ -570,7 +573,7 @@ class AsyncAzureCompletions(AsyncCompletionsOperations):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureAsyncStream[AzureCompletion]:
+    ) -> AsyncIterable[AzureCompletion]:
         """
         Creates a completion for the provided prompt and parameters.
 
@@ -724,7 +727,7 @@ class AsyncAzureCompletions(AsyncCompletionsOperations):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | None | NotGiven = NOT_GIVEN,
-    ) -> AzureCompletion | AzureAsyncStream[AzureCompletion]:
+    ) -> AzureCompletion | AsyncIterable[AzureCompletion]:
         stream_dict: Dict[str, Literal[True]] = { # TODO: pylance is upset if I pass through the parameter value. Overload + override combination is problematic
             "stream": True
         } if stream else {}
@@ -755,14 +758,14 @@ class AsyncAzureCompletions(AsyncCompletionsOperations):
         )
 
         if isinstance(response, AsyncStream):
-            response = AzureAsyncStream[AzureCompletion](
-                cast_to=AzureCompletion,
-                response=response.response,
+            return async_iterator(
+                response=response,
+                response_cls=AzureCompletion
             )
         else:
             response_json = response.model_dump(mode="json")
             response = AzureCompletion.construct(**response_json)
-        return response  # type: ignore
+            return response  # type: ignore
 
 
 class AsyncAzureOpenAIClient(AsyncClient):
@@ -781,14 +784,22 @@ class AsyncAzureOpenAIClient(AsyncClient):
     def completions(self, value: AsyncAzureCompletions) -> None:
         self._completions = value
 
-    def __init__(self, *args: Any, credential: Optional["TokenCredential"] = None, api_version: str = '2023-09-01-preview', **kwargs: Any):
+    @overload
+    def __init__(self, base_url: str, api_key: str, api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
+        ...
+
+    @overload
+    def __init__(self, base_url: str, credential: "AsyncTokenCredential", api_version: str = '2023-09-01-preview', **kwargs: Any) -> None:
+        ...
+
+    def __init__(self, **kwargs: Any) -> None:
         default_query = kwargs.get('default_query', {})
-        default_query.setdefault('api-version', api_version)
+        default_query.setdefault('api-version', kwargs.pop("api_version", '2023-09-01-preview'))
         kwargs['default_query'] = default_query
-        self.credential = credential
-        if credential:
+        self.credential = kwargs.pop("credential", None)
+        if self.credential:
             kwargs['api_key'] = 'Placeholder: AAD' # TODO: There is an assumption/validation there is always an API key.
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self._chat = AsyncAzureChat(self)
 
     @property
