@@ -272,7 +272,7 @@ class OpenAI(SyncAPIClient):
     def qs(self) -> Querystring:
         return Querystring(array_format="brackets")
 
-    def refresh_auth_headers(self):
+    def refresh_auth_headers(self) -> None:
         secret = self.bearer_token_provider() if self.bearer_token_provider else self.api_key
         if not secret:
             # if the api key is an empty string, encoding the header will fail
@@ -597,7 +597,7 @@ class AsyncOpenAI(AsyncAPIClient):
     def qs(self) -> Querystring:
         return Querystring(array_format="brackets")
 
-    async def refresh_auth_headers(self):
+    async def refresh_auth_headers(self) -> None:
         if self.bearer_token_provider:
             secret = await self.bearer_token_provider()
         else:
