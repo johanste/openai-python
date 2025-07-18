@@ -123,14 +123,14 @@ class OpenAI(SyncAPIClient):
         - `organization` from `OPENAI_ORG_ID`
         - `project` from `OPENAI_PROJECT_ID`
         """
+        if api_key and bearer_token_provider:
+            raise ValueError("The `api_key` and `bearer_token_provider` arguments are mutually exclusive")
         if api_key is None:
             api_key = os.environ.get("OPENAI_API_KEY")
         if api_key is None and bearer_token_provider is None:
             raise OpenAIError(
                 "The api_key or bearer_token_provider client option must be set either by passing api_key or bearer_token_provider to the client or by setting the OPENAI_API_KEY environment variable"
             )
-        if api_key and bearer_token_provider:
-            raise ValueError("The `api_key` and `bearer_token_provider` arguments are mutually exclusive")
         self.bearer_token_provider = bearer_token_provider
         self.api_key = api_key or ""
 
@@ -448,14 +448,14 @@ class AsyncOpenAI(AsyncAPIClient):
         - `organization` from `OPENAI_ORG_ID`
         - `project` from `OPENAI_PROJECT_ID`
         """
+        if api_key and bearer_token_provider:
+            raise ValueError("The `api_key` and `bearer_token_provider` arguments are mutually exclusive")
         if api_key is None:
             api_key = os.environ.get("OPENAI_API_KEY")
         if api_key is None and bearer_token_provider is None:
             raise OpenAIError(
                 "The api_key or bearer_token_provider client option must be set either by passing api_key or bearer_token_provider to the client or by setting the OPENAI_API_KEY environment variable"
             )
-        if api_key and bearer_token_provider:
-            raise ValueError("The `api_key` and `bearer_token_provider` arguments are mutually exclusive")
         self.bearer_token_provider = bearer_token_provider
         self.api_key = api_key or ""
 
