@@ -250,7 +250,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
         self._azure_endpoint = httpx.URL(azure_endpoint) if azure_endpoint else None
 
     @override
-    def copy(
+    def copy(  # type: ignore[reportIncompatibleMethodOverride]
         self,
         *,
         api_key: str | None = None,
@@ -524,7 +524,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
         self._azure_endpoint = httpx.URL(azure_endpoint) if azure_endpoint else None
 
     @override
-    def copy(
+    def copy(  # type: ignore[reportIncompatibleMethodOverride]
         self,
         *,
         api_key: str | None = None,
