@@ -98,6 +98,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
         azure_ad_token: str | None = None,
         azure_ad_token_provider: AzureADTokenProvider | None = None,
         organization: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -117,6 +118,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
         azure_ad_token: str | None = None,
         azure_ad_token_provider: AzureADTokenProvider | None = None,
         organization: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -136,6 +138,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
         azure_ad_token: str | None = None,
         azure_ad_token_provider: AzureADTokenProvider | None = None,
         organization: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -156,6 +159,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
         azure_ad_token_provider: AzureADTokenProvider | None = None,
         organization: str | None = None,
         project: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         base_url: str | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
@@ -234,6 +238,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
             api_key=api_key,
             organization=organization,
             project=project,
+            webhook_secret=webhook_secret,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
@@ -250,12 +255,13 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
         self._azure_endpoint = httpx.URL(azure_endpoint) if azure_endpoint else None
 
     @override
-    def copy(
+    def copy(  # type: ignore
         self,
         *,
         api_key: str | None = None,
         organization: str | None = None,
         project: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         api_version: str | None = None,
         azure_ad_token: str | None = None,
@@ -277,6 +283,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
             api_key=api_key,
             organization=organization,
             project=project,
+            webhook_secret=webhook_secret,
             websocket_base_url=websocket_base_url,
             base_url=base_url,
             timeout=timeout,
@@ -294,7 +301,7 @@ class AzureOpenAI(BaseAzureClient[httpx.Client, Stream[Any]], OpenAI):
             },
         )
 
-    with_options = copy
+    with_options = copy  # type: ignore
 
     def _get_azure_ad_token(self) -> str | None:
         if self._azure_ad_token is not None:
@@ -370,6 +377,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
         azure_ad_token_provider: AsyncAzureADTokenProvider | None = None,
         organization: str | None = None,
         project: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -390,6 +398,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
         azure_ad_token_provider: AsyncAzureADTokenProvider | None = None,
         organization: str | None = None,
         project: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -410,6 +419,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
         azure_ad_token_provider: AsyncAzureADTokenProvider | None = None,
         organization: str | None = None,
         project: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -430,6 +440,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
         azure_ad_token_provider: AsyncAzureADTokenProvider | None = None,
         organization: str | None = None,
         project: str | None = None,
+        webhook_secret: str | None = None,
         base_url: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
@@ -508,6 +519,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
             api_key=api_key,
             organization=organization,
             project=project,
+            webhook_secret=webhook_secret,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
@@ -524,12 +536,13 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
         self._azure_endpoint = httpx.URL(azure_endpoint) if azure_endpoint else None
 
     @override
-    def copy(
+    def copy(  # type: ignore
         self,
         *,
         api_key: str | None = None,
         organization: str | None = None,
         project: str | None = None,
+        webhook_secret: str | None = None,
         websocket_base_url: str | httpx.URL | None = None,
         api_version: str | None = None,
         azure_ad_token: str | None = None,
@@ -551,6 +564,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
             api_key=api_key,
             organization=organization,
             project=project,
+            webhook_secret=webhook_secret,
             websocket_base_url=websocket_base_url,
             base_url=base_url,
             timeout=timeout,
@@ -568,7 +582,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
             },
         )
 
-    with_options = copy
+    with_options = copy  # type: ignore
 
     async def _get_azure_ad_token(self) -> str | None:
         if self._azure_ad_token is not None:
@@ -614,7 +628,7 @@ class AsyncAzureOpenAI(BaseAzureClient[httpx.AsyncClient, AsyncStream[Any]], Asy
             "api-version": self._api_version,
             "deployment": self._azure_deployment or model,
         }
-        if self.api_key != "<missing API key>":
+        if self.api_key and self.api_key != "<missing API key>":
             auth_headers = {"api-key": self.api_key}
         else:
             token = await self._get_azure_ad_token()
